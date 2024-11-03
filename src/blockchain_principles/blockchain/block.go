@@ -36,14 +36,6 @@ func NewBlock(index int, timestamp time.Time, bpm int, prevHash string) *Block {
 	return block
 }
 
-func calculateHash(block Block) string {
-	record := strconv.Itoa(block.Index) + block.Timestamp + strconv.Itoa(block.BPM) + block.PrevHash
-	h := sha256.New()
-	h.Write([]byte(record))
-	hashed := h.Sum(nil)
-	return hex.EncodeToString(hashed)
-}
-
 func proofOfWork(block Block) (int, string) {
 	nonce := 0
 	for {
