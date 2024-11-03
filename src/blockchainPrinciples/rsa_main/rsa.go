@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"time"
-	"web3_solidity_notes/src/blockchain_principles/pow"
-	rsa_util "web3_solidity_notes/src/blockchain_principles/rsa"
+	"web3_solidity_notes/src/blockchainPrinciples/pow"
+	rsa_util "web3_solidity_notes/src/blockchainPrinciples/rsa"
 )
 
 func main() {

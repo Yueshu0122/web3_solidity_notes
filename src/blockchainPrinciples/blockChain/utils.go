@@ -31,14 +31,14 @@ func syncBlockchain(nodes []string) {
 	for _, node := range nodes {
 		resp, err := http.Get(node + "/")
 		if err != nil {
-			log.Printf("Failed to fetch blockchain from %s: %v\n", node, err)
+			log.Printf("Failed to fetch blockChain from %s: %v\n", node, err)
 			continue
 		}
 		defer resp.Body.Close()
 
 		var remoteBlockchain []Block
 		if err := json.NewDecoder(resp.Body).Decode(&remoteBlockchain); err != nil {
-			log.Printf("Failed to decode blockchain from %s: %v\n", node, err)
+			log.Printf("Failed to decode blockChain from %s: %v\n", node, err)
 			continue
 		}
 

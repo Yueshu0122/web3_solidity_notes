@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 var Blockchain []Block
@@ -17,10 +16,12 @@ var Mempool []Transaction
 var mutex = &sync.Mutex{}
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal(err)
-	}
+	fmt.Println("Starting Blockchain Simulation...")
+
+	//err := godotenv.Load()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	// 通过命令行参数指定端口号
 	portPtr := flag.Int("port", 8080, "HTTP server port")

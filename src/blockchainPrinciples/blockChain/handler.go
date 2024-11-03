@@ -122,7 +122,7 @@ func handleBroadcastBlock(w http.ResponseWriter, r *http.Request) {
 	if len(Blockchain) == 0 {
 		// 如果本地区块链为空，直接添加新区块
 		Blockchain = append(Blockchain, newBlock)
-		respondWithJSON(w, r, http.StatusOK, map[string]string{"message": "Block added to empty blockchain"})
+		respondWithJSON(w, r, http.StatusOK, map[string]string{"message": "Block added to empty blockChain"})
 		return
 	}
 
@@ -130,7 +130,7 @@ func handleBroadcastBlock(w http.ResponseWriter, r *http.Request) {
 
 	if isBlockValid(newBlock, prevBlock) {
 		Blockchain = append(Blockchain, newBlock)
-		respondWithJSON(w, r, http.StatusOK, map[string]string{"message": "Block added to blockchain"})
+		respondWithJSON(w, r, http.StatusOK, map[string]string{"message": "Block added to blockChain"})
 	} else {
 		respondWithJSON(w, r, http.StatusBadRequest, map[string]string{"error": "Invalid block"})
 	}

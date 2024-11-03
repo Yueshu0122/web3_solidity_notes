@@ -1,9 +1,9 @@
-package pow_main
+package main
 
 import (
 	"fmt"
 	"time"
-	"web3_solidity_notes/src/blockchain_principles/pow"
+	"web3_solidity_notes/src/blockchainPrinciples/pow"
 )
 
 func main() {

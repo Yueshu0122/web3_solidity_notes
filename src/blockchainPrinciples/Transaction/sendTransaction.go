@@ -11,6 +11,21 @@ import (
 	"time"
 )
 
+var nodeList = []string{
+	"http://localhost:8001",
+	"http://localhost:8002",
+	"http://localhost:8003",
+	"http://localhost:8004",
+	"http://localhost:8005",
+}
+
+type Transaction struct {
+	Sender    string `json:"sender"`
+	Receiver  string `json:"receiver"`
+	Amount    int    `json:"amount"`
+	Timestamp string `json:"timestamp"`
+}
+
 func main() {
 	// 节点列表
 	nodes := nodeList
