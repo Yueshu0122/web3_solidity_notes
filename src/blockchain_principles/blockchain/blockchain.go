@@ -1,74 +1,46 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"strconv"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
-	"time"
+	"sync"
 )
 
-type Block struct {
-	Index        int
-	Timestamp    string
-	BPM          int
-	Hash         string
-	PrevHash     string
-	Nonce        int
-	Transactions []Transaction
-}
+var Blockchain []Block
+var mutex = &sync.Mutex{}
 
-type Transaction struct {
-	Sender    string `json:"sender"`
-	Receiver  string `json:"receiver"`
-	Amount    int    `json:"amount"`
-	Timestamp string `json:"timestamp"`
-}
+func syncBlockchain(nodes []string) {
+	longestChain := Blockchain
+	longestLength := len(Blockchain)
 
-var nodeList = []string{
-	"http://localhost:8001",
-	"http://localhost:8002",
-	"http://localhost:8003",
-	"http://localhost:8004",
-	"http://localhost:8005",
-}
+	for _, node := range nodes {
+		resp, err := http.Get(node + "/")
+		if err != nil {
+			fmt.Printf("Failed to fetch blockchain from %s: %v\n", node, err)
+			continue
+		}
+		defer resp.Body.Close()
 
-const difficulty = 4 // 难度值，表示哈希值前缀需要多少个0
+		var remoteBlockchain []Block
+		if err := json.NewDecoder(resp.Body).Decode(&remoteBlockchain); err != nil {
+			fmt.Printf("Failed to decode blockchain from %s: %v\n", node, err)
+			continue
+		}
 
-func NewBlock(index int, timestamp time.Time, bpm int, prevHash string, transactions []Transaction) *Block {
-	block := &Block{
-		Index:        index,
-		Timestamp:    timestamp.String(),
-		BPM:          bpm,
-		PrevHash:     prevHash,
-		Transactions: transactions,
-	}
-	nonce, hash := proofOfWork(*block)
-	block.Nonce = nonce
-	block.Hash = hash
-	return block
-}
-
-func proofOfWork(block Block) (int, string) {
-	nonce := 0
-	for {
-		nonce++
-		hash := calculateHashWithNonce(block, nonce)
-		if hash[:difficulty] == strings.Repeat("0", difficulty) {
-			return nonce, hash
+		if len(remoteBlockchain) > longestLength && isChainValid(remoteBlockchain) {
+			longestChain = remoteBlockchain
+			longestLength = len(remoteBlockchain)
 		}
 	}
-}
 
-func calculateHashWithNonce(block Block, nonce int) string {
-	record := strconv.Itoa(block.Index) + block.Timestamp + strconv.Itoa(block.BPM) + block.PrevHash + strconv.Itoa(nonce)
-	for _, tx := range block.Transactions {
-		record += tx.Sender + tx.Receiver + strconv.Itoa(tx.Amount) + tx.Timestamp
+	if !slicesEqual(longestChain, Blockchain) {
+		mutex.Lock()
+		Blockchain = longestChain
+		mutex.Unlock()
+		fmt.Println("Blockchain updated to the longest chain")
 	}
-	h := sha256.New()
-	h.Write([]byte(record))
-	hashed := h.Sum(nil)
-	return hex.EncodeToString(hashed)
 }
 
 func isChainValid(chain []Block) bool {
@@ -106,47 +78,7 @@ func slicesEqual(a, b []Block) bool {
 		return false
 	}
 	for i := range a {
-		if !blocksEqual(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func blocksEqual(a, b Block) bool {
-	if a.Index != b.Index {
-		return false
-	}
-	if a.Timestamp != b.Timestamp {
-		return false
-	}
-	if a.BPM != b.BPM {
-		return false
-	}
-	if a.Hash != b.Hash {
-		return false
-	}
-	if a.PrevHash != b.PrevHash {
-		return false
-	}
-	if a.Nonce != b.Nonce {
-		return false
-	}
-	if !transactionsEqual(a.Transactions, b.Transactions) {
-		return false
-	}
-	return true
-}
-
-func transactionsEqual(a, b []Transaction) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i].Sender != b[i].Sender ||
-			a[i].Receiver != b[i].Receiver ||
-			a[i].Amount != b[i].Amount ||
-			a[i].Timestamp != b[i].Timestamp {
+		if a[i] != b[i] {
 			return false
 		}
 	}

@@ -3,25 +3,18 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gorilla/mux"
 )
-
-type Message struct {
-	BPM int
-}
 
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 	muxRouter.HandleFunc("/", handleGetBlockchain).Methods("GET")
 	muxRouter.HandleFunc("/", handleWriteBlock).Methods("POST")
 	muxRouter.HandleFunc("/block", handleBroadcastBlock).Methods("POST")
-	muxRouter.HandleFunc("/transaction", handleBroadcastTransaction).Methods("POST")
-	muxRouter.HandleFunc("/receive-transaction", handleReceiveTransaction).Methods("POST")
 	return muxRouter
 }
 
@@ -48,10 +41,10 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 
 	mutex.Lock()
 	prevBlock := Blockchain[len(Blockchain)-1]
-	newBlock := generateBlock(prevBlock, msg.BPM, Mempool)
+	newBlock := generateBlock(prevBlock, msg.BPM)
+
 	if isBlockValid(newBlock, prevBlock) {
 		Blockchain = append(Blockchain, newBlock)
-		Mempool = []Transaction{} // 清空内存池
 		spew.Dump(Blockchain)
 
 		// 广播新区块给其他节点
@@ -63,46 +56,38 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, r, http.StatusCreated, newBlock)
 }
 
-func handleBroadcastTransaction(w http.ResponseWriter, r *http.Request) {
-	var transaction Transaction
-
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&transaction); err != nil {
-		respondWithJSON(w, r, http.StatusBadRequest, map[string]string{"error": "Invalid transaction format"})
-		return
+func broadcastNewBlock(block Block) {
+	nodes := []string{"http://node1.example.com", "http://node2.example.com"}
+	for _, node := range nodes {
+		resp, err := http.Post(node+"/block", "application/json", bytes.NewBuffer(mustMarshal(block)))
+		if err != nil {
+			log.Printf("Failed to broadcast block to %s: %v", node, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("Node %s rejected the block: %v", node, resp.Status)
+		}
 	}
-
-	defer r.Body.Close()
-
-	mutex.Lock()
-	Mempool = append(Mempool, transaction)
-	mutex.Unlock()
-
-	// 广播交易给其他节点
-	broadcastTransaction(transaction)
-
-	respondWithJSON(w, r, http.StatusCreated, map[string]string{"message": "Transaction added to mempool"})
 }
 
-func handleReceiveTransaction(w http.ResponseWriter, r *http.Request) {
-	var transaction Transaction
+func mustMarshal(v interface{}) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		log.Fatalf("Failed to marshal data: %v", err)
+	}
+	return data
+}
 
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&transaction); err != nil {
-		respondWithJSON(w, r, http.StatusBadRequest, map[string]string{"error": "Invalid transaction format"})
+func respondWithJSON(w http.ResponseWriter, r *http.Request, code int, payload interface{}) {
+	response, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("HTTP 500: Internal Server Error"))
 		return
 	}
-
-	defer r.Body.Close()
-
-	mutex.Lock()
-	Mempool = append(Mempool, transaction)
-	mutex.Unlock()
-
-	// 继续广播交易给其他节点
-	broadcastTransaction(transaction)
-
-	respondWithJSON(w, r, http.StatusCreated, map[string]string{"message": "Transaction received and added to mempool"})
+	w.WriteHeader(code)
+	w.Write(response)
 }
 
 func handleBroadcastBlock(w http.ResponseWriter, r *http.Request) {
@@ -134,56 +119,4 @@ func handleBroadcastBlock(w http.ResponseWriter, r *http.Request) {
 	} else {
 		respondWithJSON(w, r, http.StatusBadRequest, map[string]string{"error": "Invalid block"})
 	}
-}
-
-func broadcastTransaction(transaction Transaction) {
-	nodes := nodeList
-	jsonTransaction, _ := json.Marshal(transaction)
-	for _, node := range nodes {
-		go func(node string) {
-			resp, err := http.Post(node+"/receive-transaction", "application/json", bytes.NewBuffer(jsonTransaction))
-			if err != nil {
-				log.Printf("Failed to broadcast transaction to %s: %v", node, err)
-				return
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				log.Printf("Failed to broadcast transaction to %s: %v", node, resp.Status)
-			}
-		}(node)
-	}
-}
-
-func broadcastNewBlock(block Block) {
-	nodes := nodeList
-	for _, node := range nodes {
-		resp, err := http.Post(node+"/block", "application/json", bytes.NewBuffer(mustMarshal(block)))
-		if err != nil {
-			log.Printf("Failed to broadcast block to %s: %v", node, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Node %s rejected the block: %v", node, resp.Status)
-		}
-	}
-}
-
-func mustMarshal(v interface{}) []byte {
-	data, err := json.Marshal(v)
-	if err != nil {
-		log.Fatalf("Failed to marshal data: %v", err)
-	}
-	return data
-}
-
-func respondWithJSON(w http.ResponseWriter, r *http.Request, code int, payload interface{}) {
-	response, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("HTTP 500: Internal Server Error"))
-		return
-	}
-	w.WriteHeader(code)
-	w.Write(response)
 }
